@@ -106,7 +106,9 @@ def is_typescript(view):
     except:
         return False
 
+    # return True
     return (view.match_selector(location, 'source.ts') or
+            view.match_selector(location, 'source.js') or
             view.match_selector(location, 'source.tsx'))
 
 

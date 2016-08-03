@@ -41,8 +41,8 @@ def view_debug(view, message):
     log.debug(message + ": " + name)
 
 
-logFile.setLevel(LOG_FILE_LEVEL)
-console.setLevel(LOG_CONSOLE_LEVEL)
+# logFile.setLevel(LOG_FILE_LEVEL)
+# console.setLevel(LOG_CONSOLE_LEVEL)
 
 
 

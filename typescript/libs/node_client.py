@@ -165,7 +165,7 @@ class NodeCommClient(CommClient):
             header = stream.readline().strip()
             if len(header) == 0:
                 if state == 'init':
-                    # log.info('0 byte line in stream when expecting header')
+                    log.info('0 byte line in stream when expecting header')
                     return proc.poll() is not None
                 else:
                     # Done reading header
@@ -174,6 +174,8 @@ class NodeCommClient(CommClient):
                 state = 'header'
                 if header.startswith(NodeCommClient.__CONTENT_LENGTH_HEADER):
                     body_length = int(header[len(NodeCommClient.__CONTENT_LENGTH_HEADER):])
+                else:
+                    log.info('weird stdout data: ' + header)
 
         if body_length > 0:
             data = stream.read(body_length)
@@ -234,6 +236,8 @@ class ServerClient(NodeCommClient):
         """
         super(ServerClient, self).__init__(script_path)
 
+        log.info("starting ServerClient")
+
         # start node process
         pref_settings = sublime.load_settings('Preferences.sublime-settings')
         node_path = pref_settings.get('node_path')
@@ -269,7 +273,7 @@ class ServerClient(NodeCommClient):
                 else:
                     log.debug("opening " + node_path + " " + script_path)
                     self.server_proc = subprocess.Popen([node_path, script_path],
-                                                         stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+                                                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             except:
                 self.server_proc = None
         # start reader thread
@@ -281,12 +285,27 @@ class ServerClient(NodeCommClient):
             readerThread.daemon = True
             readerThread.start()
 
+            readerThread2 = threading.Thread(target=ServerClient.__reader2, args =(
+                self.server_proc.stderr, self.msgq, self.eventq, self.asyncReq, self.server_proc, self.event_handlers))
+            readerThread2.daemon = True
+            readerThread2.start()
+
+    @staticmethod
+    def __reader2(stream, msgq, eventq, asyncReq, proc, eventHandlers):
+        while True:
+            line = stream.readline().strip()
+            if (len(line) == 0 and proc.poll() is not None):
+                return
+
+            log.warn("stderr from child proc " + line.decode('utf-8'))
+
     @staticmethod
     def __reader(stream, msgq, eventq, asyncReq, proc, eventHandlers):
         """ Main function for reader thread """
         while True:
             if NodeCommClient.read_msg(stream, msgq, eventq, asyncReq, proc, eventHandlers):
-                log.debug("server exited")
+                log.warn("server exited: " + str(proc.returncode))
+                log.warn("server last message: " + stream.read().strip().decode('utf-8'))
                 return
 
 
@@ -298,6 +317,8 @@ class WorkerClient(NodeCommClient):
 
     def start(self):
         WorkerClient.stop_worker = False
+
+        log.info("starting WorkerClient")
 
         node_path = global_vars.get_node_path()
         if os.name == "nt":
